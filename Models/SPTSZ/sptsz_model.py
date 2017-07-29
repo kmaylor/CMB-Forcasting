@@ -4,6 +4,9 @@ from Models.CMB.Fisher_camb import camb_model
 from Models.Foregrounds.spt_foregrounds import foregrounds
 
 class sptsz_model():
+    '''
+    SPTSZ model for testing purposes, made some changes since last used, might be broken.
+    '''
     
     def __init__(self):
         
@@ -17,7 +20,7 @@ class sptsz_model():
         params['omch2']=params['ommh2']-params['ombh2']
         self.dl = self.cmb(**params)['TT'][self.windowrange]+self.foregrounds(**params)['TT'][self.windowrange]
         self.dl *= (1+.26*1.23e-3*self.DlnClDlnl(self.dl))
-        return {'TT':dot(self.windows,self.dl)*params.get('cal',1)}
+        return dot(self.windows,self.dl)*params.get('cal',1)
     
     def DlnClDlnl(self,y):
         

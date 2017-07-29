@@ -2,6 +2,9 @@
 from numpy import hstack, loadtxt, arange
 
 class foregrounds():
+    '''
+    Model for SPT-SZ foregrounds
+    '''
     
     def __init__(self):
         self.sz_template = hstack([[0],loadtxt("/home/kmaylor/Python_Projects/PlanckVSPT/foreground_templates/SZ_template.txt")[:,1]])
