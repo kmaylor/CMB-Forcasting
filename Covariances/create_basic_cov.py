@@ -3,6 +3,7 @@ from Models.CMB.Fisher_camb import camb_model
 from numpy import pi, exp, arange, outer, sqrt, array, zeros, floor, ceil, dot, ndarray, diag
 from itertools import product
 from pickle import dump
+from collections import Iterable
 
 #When using from create_basic_cov import * only the following line will be imported
 __all__ = ['create_basic_cov','make_full_cov']
@@ -27,13 +28,15 @@ def calc_noise_weight(noise,units,fsky,time):
     covariances is reduced to 4
     '''
     if units == 'uks':
-        w=lambda n:(n**2)*(4*pi*fsky)/time
-        return {'TT':w(noise),'EE':w(noise*sqrt(2)),'TE':0.0}
+        w_inv=lambda n:1/sum(time/((n**2)*(4*pi*fsky)))
+        return {'TT':w_inv(noise),'EE':w_inv(noise*sqrt(2)),'TE':0.0}
     elif units == 'uk2sr':
-        return {'TT':noise,'EE':noise*2,'TE':0.0}
+        w_inv=lambda n:1/sum(n)
+        return {'TT':w_inv(noise),'EE':w_inv(noise*2),'TE':0.0}
     elif units == 'ukarc':
-        w=lambda n:n**2/11818113.9613 #big number is the # of arcmin^2 per steradian
-        return {'TT':w(noise),'EE':w(noise*sqrt(2)),'TE':0.0}
+        arcmin_per_sr = 11818113.9613 #big number is the # of arcmin^2 per steradian
+        w_inv=lambda n:1/sum(arcmin_per_sr/n**2) 
+        return {'TT':w_inv(noise),'EE':w_inv(noise*sqrt(2)),'TE':0.0}
     else:
         raise ValueError("Noise units musk be either uks, uk2sr, or ukarc. See \
                           documentation for more details.")
@@ -76,7 +79,7 @@ def create_basic_cov(fsky,
     """
     fsky: Fraction of sky coverage
     beam_FWHM: beam_FWHM in radians
-    noise: tuple of magnitude of noise (expected in temperature) and string specifying noise units, either
+    noise: list of magnitude of noise (expected in temperature) and string specifying noise units, either
             'uks' = uKs^.5
             'uk2sr' = uK^2-steradians
             'ukarc' = uK-arcmin
@@ -104,7 +107,8 @@ def create_basic_cov(fsky,
     #####################################
     
     ### NOISE TERMS ###
-    w_inv = calc_noise_weight(noise[0],noise[1],fsky,time)
+    if not isinstance(noise[0],Iterable): noise[0]=[noise[0]]
+    w_inv = calc_noise_weight(array(noise[0]),noise[1],fsky,time)
     B2_l_inv = lambda l: exp(l*(l+1)*(beam_FWHM/2.355)**2)
     ###################
     
