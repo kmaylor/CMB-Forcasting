@@ -1,4 +1,4 @@
-# CMB-Forcasting
+# CMB-Forecasting
 The main file is FIsher_CMB.py.
 This contains all of the general fisher matrix calculation stuff. To use it you want to run "from Fisher_CMB import *"
 You can then get the fisher matrix by by running FIsher_Matrix(params,cov, model).
