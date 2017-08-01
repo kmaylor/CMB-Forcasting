@@ -16,4 +16,3 @@ just the dictionary of covs, TTTT and so on.
 
 That should be about it. There is a notebook where you can see how I use things, but it is a bit sloppy, I have not had the time to comment on everything.
 
-##
