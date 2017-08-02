@@ -43,7 +43,7 @@ def Fisher_Matrix(params,cov,model,show_results=True):
     else:
         FM=(add_priors(params,Fisher_Calc(derivative(model,params),cov)), [k for k,v in params.items()
                                                                            if isinstance(v,fish_param)])
-        
+        print(FM[0])
         for i,x in enumerate(zip(FM[1],sqrt(diag(inv(FM[0]))))):
             print(i,x[0],x[1])
         return FM
