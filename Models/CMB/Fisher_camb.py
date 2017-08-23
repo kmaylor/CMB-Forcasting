@@ -59,12 +59,12 @@ class camb_model():
         #feed params to camb and calulate power spectra, returned in specs
         cp=self._camb.set_params(**params)
         self.result = self._camb.get_results(cp)
-        specs = self.result.get_cmb_power_spectra(spectra=['total','lens_potential'])
+        specs = self.result.get_cmb_power_spectra(spectra=['unlensed_total','lens_potential'])
         
         #Sort spectra by component instead of ell. Easier for adding foregrounds
         #need to fix units for lensing             
         tmp= dict(list(zip(['TT','EE','BB','TE','PP','PT','PE'],
-                    [ x for y in ['total','lens_potential'] 
+                    [ x for y in ['unlensed_total','lens_potential'] 
                      for x in (cp.TCMB*1e6)**2*specs[y].T] )))
         if spectra == None:
             return tmp

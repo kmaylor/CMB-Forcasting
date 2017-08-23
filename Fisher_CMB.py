@@ -1,6 +1,6 @@
 
 from copy import deepcopy
-from numpy import dot, array, zeros, diag, sqrt, arange, shape
+from numpy import dot, array, zeros, diag, sqrt, arange, shape, delete
 from scipy.linalg import cho_factor, cho_solve, inv
 from collections import OrderedDict
 
@@ -36,14 +36,13 @@ def Fisher_Matrix(params,cov,model,show_results=True):
     """
     # Turn params into OrderedDict object to keep everything in order
     params = OrderedDict(sorted(params.items()))
+    params_to_return=([j for j in [k for k,v in params.items() if isinstance(v,fish_param)] if not params[j].nuisance])
+    
     
     if show_results==False:    
-        return (add_priors(params,Fisher_Calc(derivative(model,params),cov)), [k for k,v in params.items()
-                                                                               if isinstance(v,fish_param)])
+        return (marginalize(params,add_priors(params,Fisher_Calc(derivative(model,params),cov))), params_to_return)
     else:
-        FM=(add_priors(params,Fisher_Calc(derivative(model,params),cov)), [k for k,v in params.items()
-                                                                           if isinstance(v,fish_param)])
-        print(FM[0])
+        FM=(marginalize(params,add_priors(params,Fisher_Calc(derivative(model,params),cov))), params_to_return)
         for i,x in enumerate(zip(FM[1],sqrt(diag(inv(FM[0]))))):
             print(i,x[0],x[1])
         return FM
@@ -57,10 +56,11 @@ class fish_param(object):
     Step: step size for derivative.
     Prior: prior contraint
     '''
-    def __init__(self,base,step,prior=None):
+    def __init__(self,base,step,prior=None,nuisance=False):
         self.base = base
         self.step = step
         self.prior = prior
+        self.nuisance=nuisance
 
 
 def derivative(model,params):
@@ -100,5 +100,15 @@ def add_priors(params,Fisher_matrix):
         if p is not None:
             Fisher_matrix[i,i]+=p**(-2)
     return Fisher_matrix
-            
+
+def marginalize(params,Fisher_matrix):
+    '''
+    Marginalize over indicated fish_params. Convert to covariance and drop nuisance terms then invert back to Fisher Matrix.
+    '''
+    index_to_remove=[]
+    marg = [ m.nuisance for l,m in params.items() if isinstance(m,fish_param)]
+    for i,p in enumerate(marg):
+        if p:
+            index_to_remove.append(i)
+    return inv(delete(delete(inv(Fisher_matrix),index_to_remove,0),index_to_remove,1))
             

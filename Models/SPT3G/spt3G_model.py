@@ -44,7 +44,7 @@ class spt3G_model():
         Fisher_CMB.py plugs parameters in here to do calculation
         '''
         #Need to convert some params to camb friendly form
-        if 'clamp' in params.keys(): params['As']=params['clamp']*exp(2*params.get('tau',.07))
+        if 'clamp' in params.keys(): params['As']=params['clamp']*exp(2*params.get('tau',.07))*1e-9
         if 'ommh2' in params.keys(): params['omch2']=params['ommh2']-params.get('ombh2',.0222)
             
         params['spectra'] = self.windows.keys()
@@ -62,10 +62,10 @@ class spt3G_model():
         easier for testing purposes).
         '''
         full_dbs=[]
-        #Currently not including foregrounds and aberration
+        #Currently not including aberration
         for k in self.order:
             dbs=zeros(self.numbins)
-            dls = cals[k]*(cmb[k][self.windowrange[k]])#+foregrounds[k][self.windowrange[k]])
+            dls = cals[k]*(cmb[k][self.windowrange[k]]+foregrounds[k][self.windowrange[k]])
             #dls[k] *= self.aberration(dls[k])
             dbs[:shape(self.windows[k])[0]] = dot(self.windows[k],dls)
             full_dbs=hstack([full_dbs,dbs])
