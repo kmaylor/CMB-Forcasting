@@ -21,22 +21,21 @@ def top_hat(loc,win_range,binn):
     th[int(loc-binn//2):int(loc+binn//2+1)]+=(1/binn)
     return th[win_range]
 
-def calc_noise_weight(noise,units,fsky,time):
+def convert_noise_weight(noise,units,fsky,time):
     '''
     Convert the input noise to units of uK-sr. Making the element for 'TE' zero allows for
     simplification of the code and the number of unique equations for calculating the block
     covariances is reduced to 4
     '''
     if units == 'uks':
-        w_inv=lambda n:1/sum(time/((n**2)*(4*pi*fsky)))
-        return {'TT':w_inv(noise),'EE':w_inv(noise*sqrt(2)),'TE':0.0}
+        con=lambda n:time/((n**2)*(4*pi*fsky))
+        return {'TT':con(noise),'EE':con(noise*sqrt(2))}
     elif units == 'uk2sr':
-        w_inv=lambda n:1/sum(n)
-        return {'TT':w_inv(noise),'EE':w_inv(noise*2),'TE':0.0}
+        return {'TT':1/noise,'EE':1/noise*2,'TE':0.0}
     elif units == 'ukarc':
         arcmin_per_sr = 11818113.9613 #big number is the # of arcmin^2 per steradian
-        w_inv=lambda n:1/sum(arcmin_per_sr/n**2) 
-        return {'TT':w_inv(noise),'EE':w_inv(noise*sqrt(2)),'TE':0.0}
+        con=lambda n:arcmin_per_sr/n**2
+        return {'TT':con(noise),'EE':con(noise*sqrt(2))}
     else:
         raise ValueError("Noise units musk be either uks, uk2sr, or ukarc. See \
                           documentation for more details.")
@@ -108,8 +107,8 @@ def create_basic_cov(fsky,
     
     ### NOISE TERMS ###
     if not isinstance(noise[0],Iterable): noise[0]=[noise[0]]
-    w_inv = calc_noise_weight(array(noise[0]),noise[1],fsky,time)
-    B2_l_inv = lambda l: exp(l*(l+1)*(beam_FWHM/2.355)**2)
+    w = convert_noise_weight(array(noise[0]),noise[1],fsky,time)
+    B2_l = lambda l: [exp(-l*(l+1)*(b/2.355)**2) for b in beam_FWHM]
     ###################
     
     ### WINDOWS ###
@@ -123,7 +122,12 @@ def create_basic_cov(fsky,
     '''
     The output of camb (cmb) is in Dl so we multiply the noise term by ell(ell+1)/2pi
     '''
-    SNB = lambda k,ell: cmb[k] + w_inv[k]*B2_l_inv(ell)*ell*(ell+1)/(2*pi)
+    
+    def SNB(k,ell):
+        try:
+            return cmb[k] + (ell*(ell+1)/(2*pi))/dot(w[k],B2_l(ell))
+        except KeyError:
+            return cmb[k]
 
     covs = {}
     ell = arange(params['lmax']+1)

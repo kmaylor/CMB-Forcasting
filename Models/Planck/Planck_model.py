@@ -1,4 +1,3 @@
-
 from numpy import  array, log, dot, exp, zeros,shape, hstack
 from Models.CMB.Fisher_camb import camb_model
 from Models.Foregrounds.planck_foregrounds import foregrounds
@@ -45,7 +44,7 @@ class planck_model():
         Fisher_CMB.py plugs parameters in here to do calculation
         '''
         #Need to convert some params to camb friendly form
-        if 'clamp' in params.keys(): params['As']=params['clamp']*exp(2*params.get('tau',.07))
+        if 'clamp' in params.keys(): params['As']=params['clamp']*exp(2*params.get('tau',.07))*1e-9
         if 'ommh2' in params.keys(): params['omch2']=params['ommh2']-params.get('ombh2',.0222)
             
         params['spectra'] = self.windows.keys()

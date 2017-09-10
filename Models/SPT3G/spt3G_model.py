@@ -1,4 +1,3 @@
-
 from numpy import  array,  log, dot, exp, zeros, errstate,shape, hstack
 from Models.CMB.Fisher_camb import camb_model
 from Models.Foregrounds.spt3G_foregrounds import foregrounds
@@ -65,22 +64,12 @@ class spt3G_model():
         #Currently not including aberration
         for k in self.order:
             dbs=zeros(self.numbins)
-            dls = cals[k]*(cmb[k][self.windowrange[k]]+foregrounds[k][self.windowrange[k]])
+            dls = cals.get(k,1)*(cmb[k][self.windowrange[k]]+foregrounds.get(k,zeros(len(cmb[k])))[self.windowrange[k]])
             #dls[k] *= self.aberration(dls[k])
             dbs[:shape(self.windows[k])[0]] = dot(self.windows[k],dls)
             full_dbs=hstack([full_dbs,dbs])
         return full_dbs
     
-    #dbs={}
-    #    full_dbs=[]
-    #    for k in self.order:
-    #        dls = cals[k]*(cmb[k][self.windowrange[k]])#+foregrounds[k][self.windowrange[k]])
-    #        dbs[k] = dot(self.windows[k],dls)
-    #    for i in range(max(self.numbins.values())):
-    #        for k in self.order:
-    #            if i < self.numbins[k]:
-    #                full_dbs.append(dbs[k])
-    #    return full_dbs
     
     def top_hat(self,loc,win_range,binn):
         '''

@@ -16,8 +16,8 @@ class camb_model():
     def __call__(self,
                  ALens=None,
                  As=None,
-                 DoLensing=None,
                  H0=None,
+                 DoLensing=None,
                  cosmomc_theta = None,
                  k_eta_max_scalar=None,
                  lmax=6000,
@@ -53,9 +53,10 @@ class camb_model():
         #Remove args with None value, CAMB will use default instead
         params = {k:v for k,v in args.items() 
                          if v is not None}
+        
         if params.get('cosmomc_theta',None) is not None:
             params['H0']=None
-            
+        
         #feed params to camb and calulate power spectra, returned in specs
         cp=self._camb.set_params(**params)
         self.result = self._camb.get_results(cp)
