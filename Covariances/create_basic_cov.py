@@ -1,9 +1,9 @@
 
-from Models.CMB.Fisher_camb import camb_model
 from numpy import pi, exp, arange, outer, sqrt, array, zeros, floor, ceil, dot, ndarray, diag
 from itertools import product
 from pickle import dump
 from collections import Iterable
+from Models.Planck.Planck_model import planck_model
 
 #When using from create_basic_cov import * only the following line will be imported
 __all__ = ['create_basic_cov','make_full_cov']
@@ -68,6 +68,7 @@ def create_basic_cov(fsky,
                      beam_FWHM,
                      noise,
                      time=3e7,
+                     model='camb',
                      specrange = (2,5000),
                      bin_size = 24,
                      spectra=['TT','EE','TE'],
@@ -99,10 +100,12 @@ def create_basic_cov(fsky,
                            'tau': 0.067,
                            'As':2.139e-09,
                            'ns': 0.9681,
-                           'lmax':6000,
-                           'lens_potential_accuracy':2.0}
+                           'lmax':6000,}
+                           #'lens_potential_accuracy':2.0}
 
-    cmb=camb_model()(**params)
+    
+   
+    cmb=planck_model(model=model).get_cmb_fgs_and_cals(params)[0]
     #####################################
     
     ### NOISE TERMS ###
@@ -130,7 +133,7 @@ def create_basic_cov(fsky,
             return cmb[k]
 
     covs = {}
-    ell = arange(params['lmax']+1)
+    ell = arange(len(cmb['EE']))
     
     # run through all block matrix calculations, the full matrix is symmetric so we don't need to do all of them.
     for k1,k2 in product(spectra,spectra):

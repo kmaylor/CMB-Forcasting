@@ -1,20 +1,19 @@
 from numpy import  array, log, dot, exp, zeros,shape, hstack
-from Models.CMB.Fisher_camb import camb_model
+from Models.CMB.Fisher_classy import model
 from Models.Foregrounds.planck_foregrounds import foregrounds
 from collections import OrderedDict
 
-__all__ = ['planck_model']
 
 class planck_model():
     '''
     Class for planck model. Initialize with spectra, ell range, and bin size to be used
     '''
     
-    def __init__(self,
+    def __init__(self, model='classy',
                  specrange = [('TT',(2,3000)),
                                 ('EE',(2,5000)),
                                 ('TE',(2,5000))],
-                 bin_size = 24):
+                 bin_size =5):
         '''
         specrange: list of tuples ('TT',slice(2,3000)) that indicate the spectra to be included in the model
         and a slice to determine the ell range. Spectra must be in the same order as the covariance you plan on using
@@ -35,7 +34,13 @@ class planck_model():
         self.numbins = max([shape(self.windows[k])[0] for k in self.windows.keys()]) 
         
         #Instance of camb and foreground model used to calculate model
-        self.cmb=camb_model()
+        if model == 'classy': 
+            from Models.CMB.Fisher_classy import model 
+        elif model == 'camb': 
+            from Models.CMB.Fisher_camb import model
+        else:
+            raise ValueError('models other than camb or classy not implemented')
+        self.cmb=model()
         self.foregrounds=foregrounds()
         
     def __call__(self,**params):
@@ -43,18 +48,9 @@ class planck_model():
         Params: dictionary of parameters needed to calculate model
         Fisher_CMB.py plugs parameters in here to do calculation
         '''
-        #Need to convert some params to camb friendly form
-        if 'clamp' in params.keys(): params['As']=params['clamp']*exp(2*params.get('tau',.07))*1e-9
-        if 'ommh2' in params.keys(): params['omch2']=params['ommh2']-params.get('ombh2',.0222)
-            
-        params['spectra'] = self.windows.keys()
         
-        #Calculate model for current params
-        cmb = self.cmb(**params)
-        foregrounds = self.foregrounds(**params)
-        cals = {'TT':1/params.get('Tcal',1)**2,
-                'TE':1/(params.get('Tcal',1)**(2)*params.get('Pcal',1)),
-                'EE':1/((params.get('Tcal',1)**(2)*params.get('Pcal',1)**(2)))}
+        cmb,cals=self.get_cmb_fgs_and_cals(params)
+        
         '''
         Apply window functions and return a single array of Dbs in order, padded with zeros to fit sqaure matrix.
         To be used with block covariance that is broken up by spectra (might change to break things up by ell instead
@@ -70,16 +66,25 @@ class planck_model():
             full_dbs=hstack([full_dbs,dbs])
         return full_dbs
     
-    #dbs={}
-    #    full_dbs=[]
-    #    for k in self.order:
-    #        dls = cals[k]*(cmb[k][self.windowrange[k]])#+foregrounds[k][self.windowrange[k]])
-    #        dbs[k] = dot(self.windows[k],dls)
-    #    for i in range(max(self.numbins.values())):
-    #        for k in self.order:
-    #            if i < self.numbins[k]:
-    #                full_dbs.append(dbs[k])
-    #    return full_dbs
+    def get_cmb_fgs_and_cals(self,params):
+        #Need to convert some params to camb friendly form
+        if params.get('clamp',None) is not None: 
+            params['As']=params['clamp']*exp(2*params.get('tau',.07))*1e-9
+            params.pop('clamp',[])
+        if params.get('ommh2',None) is not None: 
+            params['omch2']=params['ommh2']-params.get('ombh2',.0222)
+            params.pop('ommh2',[])
+            
+        params['spectra'] = self.windows.keys()
+        
+        #Calculate model for current params
+        cmb = self.cmb(**params)
+        foregrounds = self.foregrounds(**params)
+        cals = {'TT':1/params.get('Tcal',1)**2,
+                'TE':1/(params.get('Tcal',1)**(2)*params.get('Pcal',1)),
+                'EE':1/((params.get('Tcal',1)**(2)*params.get('Pcal',1)**(2)))}
+        return (cmb,cals)
+    
     
     def top_hat(self,loc,win_range,binn):
         '''

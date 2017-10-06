@@ -1,4 +1,4 @@
-class camb_model(): 
+class model(): 
     """
     Make a call to an instance of this class to calculate the a CMB spectrum using CAMB.
     Unless specified otherwise it returns TT, EE, BB, and TE.
@@ -17,7 +17,6 @@ class camb_model():
                  ALens=None,
                  As=None,
                  H0=None,
-                 DoLensing=None,
                  cosmomc_theta = None,
                  k_eta_max_scalar=None,
                  lmax=6000,

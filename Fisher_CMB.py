@@ -38,14 +38,17 @@ def Fisher_Matrix(params,cov,model,show_results=True):
     params = OrderedDict(sorted(params.items()))
     params_to_return=([j for j in [k for k,v in params.items() if isinstance(v,fish_param)] if not params[j].nuisance])
     
-    
-    if show_results==False:    
-        return (marginalize(params,add_priors(params,Fisher_Calc(derivative(model,params),cov))), params_to_return)
-    else:
-        FM=(marginalize(params,add_priors(params,Fisher_Calc(derivative(model,params),cov))), params_to_return)
-        for i,x in enumerate(zip(FM[1],sqrt(diag(inv(FM[0]))))):
+    FM=Fisher_Calc(derivative(model,params),cov)
+    FM_with_priors=add_priors(params,FM)
+    FM_marginalized=marginalize(params,FM_with_priors)
+    FM=FM_marginalized
+    if show_results:
+        for i,x in enumerate(zip(params_to_return,sqrt(diag(inv(FM))))):
             print(i,x[0],x[1])
-        return FM
+        
+    return (marginalize(params,add_priors(params,Fisher_Calc(derivative(model,params),cov))), params_to_return)
+        
+    
         
 class fish_param(object):
     '''
