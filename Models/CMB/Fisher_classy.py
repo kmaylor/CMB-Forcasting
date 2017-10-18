@@ -1,4 +1,4 @@
-from numpy import arange, pi
+from numpy import arange, pi, sqrt
 
 
 class model():
@@ -60,7 +60,9 @@ class model():
                  cosmomc_theta=None,
                  YHe = None,
                  ic = None,
-                 lensing='yes',
+                 theta=None,
+                 lensing='no',
+                 T_ncdm=(4/11)**(1/3),
                  nokwargs =False,
                  spectra=None,
                  gauge='Newton',
@@ -78,7 +80,7 @@ class model():
   
         args.pop('nokwargs',[]) 
         args.pop('spectra',[])
-       
+        args.pop('DoLensing',[])
         #Remove args with None value, CLASS will use default instead
         params = {k:v for k,v in args.items() 
                          if v is not None}
@@ -86,23 +88,31 @@ class model():
         if params.get('ic',None) is not None:
             params.pop('As',[])
             params.pop('ns',[])
+        if params.get('N_ur',None) is None: params['N_ur'] = params.pop('nnu',3.046)-1
         params.pop('Pcal',[])
         params.pop('Asz',[])
         params.pop('Acib',[])
-        params.pop('Aps',[])
         params.pop('A_TEps',[])
+        params.pop('Aps',[])
+
+        if params.get('P_{RR}^1',None) is not None: params['|P_{RI}^2|']=abs(params['P_{RI}^1'])*sqrt(params['P_{RR}^2']*params['P_{II}^2']) \
+                                                    /sqrt(params['P_{RR}^1']*params['P_{II}^1'])
+
         self.model.set(self.convert_params(**params))
         
         self.model.compute()
         lmax = params['lmax']
         ell = arange(lmax+1)
-        self.cmb_result = {x:(self.model.raw_cl(lmax)[x.lower()])*self.model.T_cmb()**2*1e12*ell*(ell+1)/2/pi
+        if lensing=='yes':
+            self.cmb_result = {x:(self.model.lensed_cl(lmax)[x.lower()])*self.model.T_cmb()**2*1e12*ell*(ell+1)/2/pi
                            for x in ['TT','TE','EE','BB','PP','TP']}
-
+        else:
+             self.cmb_result = {x:(self.model.raw_cl(lmax)[x.lower()])*self.model.T_cmb()**2*1e12*ell*(ell+1)/2/pi
+                           for x in ['TT','TE','EE','BB','PP','TP']}
         self.model.struct_cleanup()
         self.model.empty()
- 
-    
+        self.cmb_result['PP']*=(ell*(ell+1))
+
         if spectra == None:
             return self.cmb_result
         else:

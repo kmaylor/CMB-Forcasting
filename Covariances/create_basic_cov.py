@@ -29,13 +29,13 @@ def convert_noise_weight(noise,units,fsky,time):
     '''
     if units == 'uks':
         con=lambda n:time/((n**2)*(4*pi*fsky))
-        return {'TT':con(noise),'EE':con(noise*sqrt(2))}
+        return {'TT':con(noise),'EE':con(noise*sqrt(2)),'BB':con(noise*sqrt(2))}
     elif units == 'uk2sr':
-        return {'TT':1/noise,'EE':1/noise*2,'TE':0.0}
+        return {'TT':1/noise,'EE':1/noise*2,'BB':1/noise*2}
     elif units == 'ukarc':
         arcmin_per_sr = 11818113.9613 #big number is the # of arcmin^2 per steradian
         con=lambda n:arcmin_per_sr/n**2
-        return {'TT':con(noise),'EE':con(noise*sqrt(2))}
+        return {'TT':con(noise),'EE':con(noise*sqrt(2)),'BB':con(noise*sqrt(2))}
     else:
         raise ValueError("Noise units musk be either uks, uk2sr, or ukarc. See \
                           documentation for more details.")
@@ -104,8 +104,9 @@ def create_basic_cov(fsky,
                            #'lens_potential_accuracy':2.0}
 
     
-   
-    cmb=planck_model(model=model).get_cmb_fgs_and_cals(params)[0]
+
+    cmb=planck_model(model=model,specrange=[(k,specrange) for k in spectra]).get_cmb_fgs_and_cals(params)[0]
+
     #####################################
     
     ### NOISE TERMS ###
@@ -133,7 +134,7 @@ def create_basic_cov(fsky,
             return cmb[k]
 
     covs = {}
-    ell = arange(len(cmb['EE']))
+    ell = arange(params['lmax']+1)
     
     # run through all block matrix calculations, the full matrix is symmetric so we don't need to do all of them.
     for k1,k2 in product(spectra,spectra):

@@ -1,5 +1,4 @@
 from numpy import  array, log, dot, exp, zeros,shape, hstack
-from Models.CMB.Fisher_classy import model
 from Models.Foregrounds.planck_foregrounds import foregrounds
 from collections import OrderedDict
 

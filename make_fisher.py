@@ -23,11 +23,11 @@ def SPT3G_Fisher(params,fsky,saveas,
             cov_params[k] = v.base
         else:
             cov_params[k]=v
-    spt3g_cov=create_basic_cov(fsky,beam_width,noise,model='camb',specrange = (lmin,max([T_lmax,P_lmax])),
+    spt3g_cov=create_basic_cov(fsky,beam_width,noise,model='classy',specrange = (lmin,max([T_lmax,P_lmax])),
                                bin_size = 5,spectra=spectra,params=cov_params)
     full_spt3g_cov=make_full_cov(spectra,spt3g_cov)
     Fs,names=Fisher_Matrix(params,full_spt3g_cov,
-                spt3G_model(model='camb',specrange = list(zip(spectra,[(lmin,T_lmax),(lmin,P_lmax),
+                spt3G_model(model='classy',specrange = list(zip(spectra,[(lmin,T_lmax),(lmin,P_lmax),
                                                             (lmin,P_lmax)])),bin_size=5),show_results=False)
     pd.DataFrame(Fs,index=names,columns=names).to_hdf(saveas,'key')
 
@@ -35,14 +35,14 @@ def SPT3G_phi_Fisher(params,fsky,saveas,
                      lmin=50,lmax=3000):
     '''Calculate a SPT3G phiphi fisher matrix from previously made covariance
     '''
-    m=spt3G_model(model='camb',specrange = [('PP',(lmin,lmax))],bin_size=5)
+    m=spt3G_model(model='classy',specrange = [('PP',(lmin,lmax))],bin_size=5)
     lensing_recon_cov_file = 'Covariances/spt3g_3.3uk_lmaxTT3000_lmaxPOL5000_nx1024_plikHM_TT_lowTEB_lensing.dat'
     PP_cov=diag(dot(m.windows['PP'],
                 (loadtxt(lensing_recon_cov_file)[:,-1]**2*(2.725*1e6)**4)[m.windowrange['PP']]))
     Fs_phi,names=Fisher_Matrix(params,PP_cov,m,show_results=False)
     pd.DataFrame(Fs_phi,index=names,columns=names).to_hdf(saveas,'key')
 
-def Planck_800_Fisher(params,saveas):
+def Planck_Fisher(params,lmax,saveas):
     '''Calculate a planck lmin<800 bandpower covariance, fisher matrix, and save as pandas dataframe
     '''
     cov_params={}
@@ -51,12 +51,12 @@ def Planck_800_Fisher(params,saveas):
             cov_params[k] = v.base
         else:
             cov_params[k]=v
-    pcov_800=create_basic_cov(.7,[.0003],[0,'ukarc'],model='camb',specrange = (2,800),bin_size = 5,
+    pcov=create_basic_cov(.7,[.0003],[0,'ukarc'],model='classy',specrange = (2,lmax),bin_size = 5,
                               spectra=['TT'],params=cov_params)
-    full_pcov_800 = make_full_cov(['TT'],pcov_800)
-    Fp_800,names=Fisher_Matrix(params,full_pcov_800,
-                 planck_model(model='camb',specrange = [('TT',(2,800))],bin_size=5),show_results=False)
-    pd.DataFrame(Fp_800,index=names,columns=names).to_hdf(saveas,'key')
+    full_pcov = make_full_cov(['TT'],pcov)
+    Fp,names=Fisher_Matrix(params,full_pcov,
+                 planck_model(model='classy',specrange = [('TT',(2,lmax))],bin_size=5),show_results=False)
+    pd.DataFrame(Fp,index=names,columns=names).to_hdf(saveas,'key')
 
 def Planck_chain_Fisher(params,chain_path,saveas):
     '''Calculate a Planck Fisher matrix from a chain'''
@@ -98,7 +98,7 @@ def slik2cmc( c ):
     c['clamp'] = exp(c['cosmo.logA'])*exp(-2*c['tau'])/10
     c['ommh2']=c['ombh2']+c['omch2']
     c['H0'] = c['cosmo.H0']
-    c['cosmomc_theta']=c['cosmo.theta']
+    c['theta']=c['cosmo.theta']
     return c
 
 params_base={'H0':fish_param(67.90,0.55),
@@ -108,19 +108,18 @@ params_base={'H0':fish_param(67.90,0.55),
                            'clamp':fish_param(1.873,0.0115),
                            'ns':fish_param( 0.9681,0.0044),
                            'lmax':6000,
-                           'AccuracyBoost':2.0,
-                           'lSampleBoost':2.0,
-                           'lAccuracyBoost':2.0,} 
-                           #'tol_background_integration' : 1.e-3 ,
-                           #'tol_thermo_integration' : 1.e-3,
-                           #'tol_perturb_integration' : 1.e-6,
-                           #'reionization_optical_depth_tol' : 1.e-5,
-                           #'l_logstep' : 1.08, 
-                           #'l_linstep' : 25,
-                           #'perturb_sampling_stepsize' : 0.04,
-                           #'delta_l_max' : 800,
-                           #'k_per_decade_for_pk': 10,
-                           #'k_per_decade_for_bao': 70}
+                           'back_integration_stepsize': 7.e-4,
+                           'tol_ncdm_bg' : 1.e-6,
+                           'tol_background_integration' : 1.e-3 ,
+                           'tol_thermo_integration' : 1.e-3,
+                           'tol_perturb_integration' : 1.e-6,
+                           'l_logstep' : 1.08, 
+                           'l_linstep' : 25,
+                           'perturb_sampling_stepsize' : 0.04,
+                           'delta_l_max' : 800,
+                           'k_per_decade_for_pk': 10,
+                           'k_per_decade_for_bao': 70,
+                           'k_max_tau0_over_l_max': 6,}
 
 params3g_base={'H0':fish_param(67.90,0.55),
                            'ombh2':fish_param(0.02227,0.0002),
@@ -134,70 +133,73 @@ params3g_base={'H0':fish_param(67.90,0.55),
                             'A_TEps' : fish_param(.16,.05,nuisance=True),
                             'Pcal':fish_param(1.06,.01,.01,nuisance=True),
                            'lmax':6000,
-                           'AccuracyBoost':2.0,
-                           'lSampleBoost':2.0,
-                           'lAccuracyBoost':2.0, }
-#                            'tol_background_integration' : 1.e-3 ,
-#                            'tol_thermo_integration' : 1.e-3,
-#                            'tol_perturb_integration' : 1.e-6,
-#                            'reionization_optical_depth_tol' : 1.e-5,
-#                            'l_logstep' : 1.08, 
-#                            'l_linstep' : 25,
-#                            'perturb_sampling_stepsize' : 0.04,
-#                            'delta_l_max' : 800,
-#                            'k_per_decade_for_pk': 10,
-#                            'k_per_decade_for_bao': 70}
+                           'back_integration_stepsize': 7.e-4,
+                           'tol_ncdm_bg' : 1.e-6,
+                           'tol_background_integration' : 1.e-3 ,
+                            'tol_thermo_integration' : 1.e-3,
+                            'tol_perturb_integration' : 1.e-6,
+                            'l_logstep' : 1.08, 
+                            'l_linstep' : 25,
+                            'perturb_sampling_stepsize' : 0.04,
+                            'delta_l_max' : 800,
+                            'k_per_decade_for_pk': 10,
+                            'k_per_decade_for_bao': 70,
+                            'k_max_tau0_over_l_max': 6}
 
-model_extensions=[('lcdm',{}),
-                  ('lcdm_neff',{'nnu':fish_param(3.046,0.03)}),
-                  ('lcdm_neff_yp',{'nnu':fish_param(3.046,0.03),
-                           'YHe':fish_param(.252,.014),}),
-                  ('lcdm_mnu',{'mnu':fish_param(.06,0.01)}),
-                  ('lcdm_omk',{'omk':fish_param(-0.003687,0.007)}),]
-#                   ('lcdm_dmdr',{'N_drf':fish_param(.6,0.1), 
-#                                 'Gamma0_dmdrf':fish_param(1.69,0.4),
-#                                'gauge':'new'}),
-#                   ('lcdm_cdi',{'ic':'ad,cdi',
-#                                'P_k_ini type':'two_scales',
-#                                'k1':.002,
-#                                'k2':.1,
-#                                  'clamp':None,
-#                                  'ns':None,
-#                                'P_{RR}^1':fish_param(24e-10,5e-11),
-#                                'P_{RR}^2':fish_param(21.5e-10,7.5e-11),
-#                                'P_{II}^1':fish_param(1e-11,5e-12),
-#                                'P_{II}^2':fish_param(10e-10,5e-10),
-#                                'P_{RI}^1':fish_param(1e-11,1e-11),
-#                                '|P_{RI}^2|':fish_param(1e-11,1e-11)}),
-#                   ('lcdm_ndi',{'ic':'ad,nid',
-#                                'P_k_ini type':'two_scales',
-#                                'k1':.002,
-#                                'k2':.1,
-#                                  'clamp':None,
-#                                  'ns':None,
-#                                'P_{RR}^1':fish_param(24e-10,5e-11),
-#                                'P_{RR}^2':fish_param(21e-10,5e-11),
-#                                'P_{II}^1':fish_param(7.5e-11,5e-11),
-#                                'P_{II}^2':fish_param(7.5e-10,3e-10),
-#                                'P_{RI}^1':fish_param(-1e-13,1e-11),
-#                                '|P_{RI}^2|':fish_param(2e-13,2e-13)}),
-#                   ('lcdm_nvi',{'ic':'ad,niv',
-#                                'P_k_ini type':'two_scales',
-#                                'k1':.002,
-#                                'k2':.1,
-#                                'clamp':None,
-#                                'ns':None,
-#                                'P_{RR}^1':fish_param(24.75e-10,5e-11),
-#                                'P_{RR}^2':fish_param(21.75e-10,5e-11),
-#                                'P_{II}^1':fish_param(7.5e-11,5e-11),
-#                                'P_{II}^2':fish_param(1e-10,5e-11),
-#                                'P_{RI}^1':fish_param(-7.5e-11,5e-12),
-#                                '|P_{RI}^2|':fish_param(7.5e-11,5e-12)}),]
+model_extensions=[#('lcdm',{}),
+                  #('lcdm_neff',{'nnu':fish_param(3.046,0.03)}),
+                  #('lcdm_neff_yp',{'nnu':fish_param(3.046,0.03),
+                  #         'YHe':fish_param(.252,.014),}),
+                  #('lcdm_mnu',{'mnu':fish_param(.06,0.01)}),
+                  #('lcdm_omk',{'omk':fish_param(-0.003687,0.007)}),
+                  #('lcdm_dmdr',{'N_drf':fish_param(.6,0.1), 
+                  #               'Gamma0_dmdrf':fish_param(1.69,0.4),
+                  #              'gauge':'new'}),
+                  ('lcdm_cdi',{'ic':'ad,cdi',
+                                'P_k_ini type':'two_scales',
+                                'k2':.002,
+                                'k1':.1,
+                                  'clamp':None,
+                                  'ns':None,
+                                'P_{RR}^1':fish_param(24.5e-10,5e-11),
+                                'P_{RR}^2':fish_param(21.5e-10,5e-11),
+                                'P_{II}^1':fish_param(1e-11,1e-12),
+                                'P_{II}^2':fish_param(4.7e-13,1e-14),
+                                'P_{RI}^1':fish_param(5e-12,1e-13),
+                                }),
+                  ('lcdm_ndi',{'ic':'ad,nid',
+                                'P_k_ini type':'two_scales',
+                                'k2':.002,
+                                'k1':.1,
+                                  'clamp':None,
+                                  'ns':None,
+                                'P_{RR}^1':fish_param(24.5e-10,5e-11),
+                                'P_{RR}^2':fish_param(21.5e-10,5e-11),
+                                'P_{II}^1':fish_param(1.2e-12,1e-13),
+                                'P_{II}^2':fish_param(4.6e-10,1e-11),
+                                'P_{RI}^1':fish_param(-1e-13,1e-14)}),
+                  ('lcdm_nvi',{'ic':'ad,niv',
+                                'P_k_ini type':'two_scales',
+                                'k2':.002,
+                                'k1':.1,
+                                'clamp':None,
+                                'ns':None,
+                                'P_{RR}^1':fish_param(24.5e-10,5e-11),
+                                'P_{RR}^2':fish_param(21.5e-10,5e-11),
+                                'P_{II}^1':fish_param(1.6e-12,1e-13),
+                                'P_{II}^2':fish_param(2.3e-10,1e-11),
+                                'P_{RI}^1':fish_param(-4e-11,1e-13),
+                                }),]
 
 for k in model_extensions:
     print(k[0])
     params=dict(params_base,**k[1])
-    Planck_800_Fisher(params,'Saved_Fisher_Matrices/planck_TT_'+k[0]+'_800_Fisher_Matrix_theta.h5')
+    Planck_Fisher(params,800,'Saved_Fisher_Matrices/planck_TT_'+k[0]+'_800_Fisher_Matrix_theta.h5')
+
+for k in model_extensions:
+    print(k[0])
+    params=dict(params_base,**k[1])
+    Planck_Fisher(params,1400,'Saved_Fisher_Matrices/planck_TT_'+k[0]+'_approx_full_Fisher_Matrix_theta.h5')
 
 for k in model_extensions:#
     print(k[0])
@@ -209,76 +211,93 @@ for k in model_extensions:
     params=dict(params_base,**k[1])
     SPT3G_phi_Fisher(params,0.06,'Saved_Fisher_Matrices/SPT3G_phi_'+k[0]+'_lmin50_Fisher_Matrices_theta.h5')
 
-planck_paths=['base/plikHM_TTTEEE_lowTEB/base_plikHM_TTTEEE_lowTEB',
-             'base_nnu/plikHM_TTTEEE_lowTEB/base_nnu_plikHM_TTTEEE_lowTEB',
-             'base_nnu_yhe/plikHM_TTTEEE_lowTEB/base_nnu_yhe_plikHM_TTTEEE_lowTEB',
-             'base_mnu/plikHM_TTTEEE_lowTEB/base_mnu_plikHM_TTTEEE_lowTEB',
-             'base_omegak/plikHM_TTTEEE_lowTEB/base_omegak_plikHM_TTTEEE_lowTEB']
-for i,k in enumerate(model_extensions):
-    if i in [0,1,2,3,4]:
-        chain_path='/nfs/home/kmaylor/Official_Planck_chains/'+planck_paths[i]
-        params=dict(params_base,**k[1])
-        chain_params=[k for k,v in params.items() if isinstance(v,fish_param)]
-        Planck_chain_Fisher(chain_params,chain_path,
-                        'Saved_Fisher_Matrices/planck_TTTEEE_lowTEB'+k[0]+'_Fisher_Matrix_theta.h5')
+#for k in model_extensions:
+#    print(k[0])
+#    params=dict(params3g_base,**k[1])
+#    SPT3G_Fisher(params,0.035,'Saved_Fisher_Matrices/SPT3G_f035_'+k[0]+'_lmin50_Fisher_Matrices_theta.h5')
 
-planck_paths=['base/plikHM_TTTEEE_lowTEB_lensing/base_plikHM_TTTEEE_lowTEB_lensing',
-             'base_nnu/plikHM_TTTEEE_lowTEB_nnu1_lensing/base_nnu_plikHM_TTTEEE_lowTEB_nnu1_lensing',
-             'base_nnu_yhe/plikHM_TTTEEE_lowTEB_lensing/base_nnu_yhe_plikHM_TTTEEE_lowTEB_lensing',
-             'base_mnu/plikHM_TTTEEE_lowTEB_lensing/base_mnu_plikHM_TTTEEE_lowTEB_lensing',
-             'base_omegak/plikHM_TTTEEE_lowTEB_lensing/base_omegak_plikHM_TTTEEE_lowTEB_lensing']
+#for k in model_extensions:
+#    print(k[0])
+#    params=dict(params_base,**k[1])
+#    SPT3G_phi_Fisher(params,0.035,'Saved_Fisher_Matrices/SPT3G_phi_f035_'+k[0]+'_lmin50_Fisher_Matrices_theta.h5')
 
-for i,k in enumerate(model_extensions):
-    if i in [0,3,4]:
-        chain_path='/nfs/home/kmaylor/Official_Planck_chains/'+planck_paths[i]
-        params=dict(params_base,**k[1])
-        chain_params=[k for k,v in params.items() if isinstance(v,fish_param)]
-        Planck_chain_Fisher(chain_params,chain_path,
-                        'Saved_Fisher_Matrices/planck_TTTEEE_lowTEB_lensing'+k[0]+'_Fisher_Matrix_theta.h5')
+#planck_paths=['base/plikHM_TTTEEE_lowTEB/base_plikHM_TTTEEE_lowTEB',
+#             'base_nnu/plikHM_TTTEEE_lowTEB/base_nnu_plikHM_TTTEEE_lowTEB',
+#             'base_nnu_yhe/plikHM_TTTEEE_lowTEB/base_nnu_yhe_plikHM_TTTEEE_lowTEB',
+#             'base_mnu/plikHM_TTTEEE_lowTEB/base_mnu_plikHM_TTTEEE_lowTEB',
+#             'base_omegak/plikHM_TTTEEE_lowTEB/base_omegak_plikHM_TTTEEE_lowTEB']
+#for i,k in enumerate(model_extensions):
+#    if i in [0,1,2,3,4]:
+#        chain_path='/nfs/home/kmaylor/Official_Planck_chains/'+planck_paths[i]
+#        params=dict(params_base,**k[1])
+#        chain_params=[k for k,v in params.items() if isinstance(v,fish_param)]
+#        Planck_chain_Fisher(chain_params,chain_path,
+#                        'Saved_Fisher_Matrices/planck_TTTEEE_lowTEB'+k[0]+'_Fisher_Matrix_theta.h5')
 
-planck_paths=['base/plikHM_TTTEEE_lowTEB_lensing_BAO/base_plikHM_TTTEEE_lowTEB_lensing_BAO',
-             'base_nnu/plikHM_TTTEEE_lowTEB_nnu1_lensing_BAO/base_nnu_plikHM_TTTEEE_lowTEB_nnu1_lensing_BAO',
-             'base_nnu_yhe/plikHM_TTTEEE_lowTEB_lensing_BAO/base_nnu_yhe_plikHM_TTTEEE_lowTEB_lensing_BAO',
-             'base_mnu/plikHM_TTTEEE_lowTEB_lensing_BAO/base_mnu_plikHM_TTTEEE_lowTEB_lensing_BAO',
-             'base_omegak/plikHM_TTTEEE_lowTEB_lensing_BAO/base_omegak_plikHM_TTTEEE_lowTEB_lensing_BAO']
+#planck_paths=['base/plikHM_TTTEEE_lowTEB_lensing/base_plikHM_TTTEEE_lowTEB_lensing',
+#             'base_nnu/plikHM_TTTEEE_lowTEB_nnu1_lensing/base_nnu_plikHM_TTTEEE_lowTEB_nnu1_lensing',
+#             'base_nnu_yhe/plikHM_TTTEEE_lowTEB_lensing/base_nnu_yhe_plikHM_TTTEEE_lowTEB_lensing',
+#             'base_mnu/plikHM_TTTEEE_lowTEB_lensing/base_mnu_plikHM_TTTEEE_lowTEB_lensing',
+#             'base_omegak/plikHM_TTTEEE_lowTEB_lensing/base_omegak_plikHM_TTTEEE_lowTEB_lensing']
 
-for i,k in enumerate(model_extensions):
-    if i in [3]:
-        chain_path='/nfs/home/kmaylor/Official_Planck_chains/'+planck_paths[i]
-        params=dict(params_base,**k[1])
-        chain_params=[k for k,v in params.items() if isinstance(v,fish_param)]
-        Planck_chain_Fisher(chain_params,chain_path,
-                        'Saved_Fisher_Matrices/planck_TTTEEE_lowTEB_lensing_BAO'+k[0]+'_Fisher_Matrix_theta.h5')
+#for i,k in enumerate(model_extensions):#
+#    if i in [0,3,4]:
+#        chain_path='/nfs/home/kmaylor/Official_Planck_chains/'+planck_paths[i]
+#        params=dict(params_base,**k[1])
+#        chain_params=[k for k,v in params.items() if isinstance(v,fish_param)]
+#        Planck_chain_Fisher(chain_params,chain_path,
+#                        'Saved_Fisher_Matrices/planck_TTTEEE_lowTEB_lensing'+k[0]+'_Fisher_Matrix_theta.h5')
 
-chain_params=[k for k,v in params_base.items() if isinstance(v,fish_param)]
+#planck_paths=['base/plikHM_TTTEEE_lowTEB_lensing_BAO/base_plikHM_TTTEEE_lowTEB_lensing_BAO',
+#             'base_nnu/plikHM_TTTEEE_lowTEB_nnu1_lensing_BAO/base_nnu_plikHM_TTTEEE_lowTEB_nnu1_lensing_BAO',
+#             'base_nnu_yhe/plikHM_TTTEEE_lowTEB_lensing_BAO/base_nnu_yhe_plikHM_TTTEEE_lowTEB_lensing_BAO',
+#             'base_mnu/plikHM_TTTEEE_lowTEB_lensing_BAO/base_mnu_plikHM_TTTEEE_lowTEB_lensing_BAO',
+#             'base_omegak/plikHM_TTTEEE_lowTEB_lensing_BAO/base_omegak_plikHM_TTTEEE_lowTEB_lensing_BAO']
 
-chain_path="/home/kmaylor/Python_Projects/cosmology_chains/SPT_chainz_150x150.chains"
-SPTSZ_chain_Fisher(chain_params,chain_path,'Saved_Fisher_Matrices/SPTSZ_lcdm_Fisher_Matrix_theta.h5')
+#for i,k in enumerate(model_extensions):
+#    if i in [3]:
+#        chain_path='/nfs/home/kmaylor/Official_Planck_chains/'+planck_paths[i]
+#        params=dict(params_base,**k[1])
+#        chain_params=[k for k,v in params.items() if isinstance(v,fish_param)]
+#        Planck_chain_Fisher(chain_params,chain_path,
+#                        'Saved_Fisher_Matrices/planck_TTTEEE_lowTEB_lensing_BAO'+k[0]+'_Fisher_Matrix_theta.h5')
+
+#hain_params=[k for k,v in params_base.items() if isinstance(v,fish_param)]
+
+#chain_path="/home/kmaylor/Python_Projects/cosmology_chains/SPT_chainz_150x150.chains"
+#SPTSZ_chain_Fisher(chain_params,chain_path,'Saved_Fisher_Matrices/SPTSZ_lcdm_Fisher_Matrix_theta.h5')
 
 F={}
+F=p.load(open('Saved_Fisher_Matrices\All_Planck_and_SPT3G_Fisher_matrices.p','rb'))
 for i,k in enumerate(model_extensions):
+    i=20
     f={}
     #SPT3G
-    f['SPT3G_fsky_0.035']=pd.read_hdf(
-        'Saved_Fisher_Matrices/SPT3G_f035_'+k[0]+'_lmin50_Fisher_Matrices_theta.h5', 'key')
+    #f['SPT3G_fsky_0.035']=pd.read_hdf(
+    #    'Saved_Fisher_Matrices/SPT3G_f035_'+k[0]+'_lmin50_Fisher_Matrices_theta.h5', 'key')
     f['SPT3G_fsky_0.06']=pd.read_hdf(
         'Saved_Fisher_Matrices/SPT3G_'+k[0]+'_lmin50_Fisher_Matrices_theta.h5', 'key')
     #SPT3G_clphiphi
     f['SPT3G_clphiphi_fsky_0.06']=pd.read_hdf(
         'Saved_Fisher_Matrices/SPT3G_phi_'+k[0]+'_lmin50_Fisher_Matrices_theta.h5', 'key')
-    f['SPT3G_clphiphi_fsky_0.035']=pd.read_hdf(
-        'Saved_Fisher_Matrices/SPT3G_phi_f035_'+k[0]+'_lmin50_Fisher_Matrices_theta.h5', 'key')
+    #f['SPT3G_clphiphi_fsky_0.035']=pd.read_hdf(
+    #    'Saved_Fisher_Matrices/SPT3G_phi_f035_'+k[0]+'_lmin50_Fisher_Matrices_theta.h5', 'key')
     #SPT3G_lensing
-    f['SPT3G_lensing_fsky_0.035']=f['SPT3G_fsky_0.035'].add(f['SPT3G_clphiphi_fsky_0.035'])
+    #f['SPT3G_lensing_fsky_0.035']=f['SPT3G_fsky_0.035'].add(f['SPT3G_clphiphi_fsky_0.035'])
     f['SPT3G_lensing_fsky_0.06']=f['SPT3G_fsky_0.06'].add(f['SPT3G_clphiphi_fsky_0.06'])
     #Planck_lmax800
     f['Planck_TT_lmax_800']=pd.read_hdf(
         'Saved_Fisher_Matrices/planck_TT_'+k[0]+'_800_Fisher_Matrix_theta.h5', 'key')
+    #Planck_full_approx
+    f['Planck_TT_approx']=pd.read_hdf(
+        'Saved_Fisher_Matrices/planck_TT_'+k[0]+'_approx_full_Fisher_Matrix_theta.h5', 'key')
+    #Planck_full_approx_and SPT3G lensing
+    f['Planck_TT_approx_SPT3G_lensing_fsky_0.06']=f['Planck_TT_approx'].add(f['SPT3G_lensing_fsky_0.06'])
     #Planck_lmax800 and SPT3G
-    f['Planck_TT_lmax_800_SPT3G_fsky_0.035']=f['Planck_TT_lmax_800'].add(f['SPT3G_fsky_0.035'])
+    #f['Planck_TT_lmax_800_SPT3G_fsky_0.035']=f['Planck_TT_lmax_800'].add(f['SPT3G_fsky_0.035'])
     f['Planck_TT_lmax_800_SPT3G_fsky_0.06']=f['Planck_TT_lmax_800'].add(f['SPT3G_fsky_0.06'])
-    f['Planck_TT_lmax_800_SPT3G_lensing_fsky_0.035']=f['Planck_TT_lmax_800_SPT3G_fsky_0.035'].add(
-        f['SPT3G_clphiphi_fsky_0.035'])
+    #f['Planck_TT_lmax_800_SPT3G_lensing_fsky_0.035']=f['Planck_TT_lmax_800_SPT3G_fsky_0.035'].add(
+    #    f['SPT3G_clphiphi_fsky_0.035'])
     f['Planck_TT_lmax_800_SPT3G_lensing_fsky_0.06']=f['Planck_TT_lmax_800_SPT3G_fsky_0.06'].add(
         f['SPT3G_clphiphi_fsky_0.06'])
     if i in [0,1,2,3,4]:
@@ -286,10 +305,10 @@ for i,k in enumerate(model_extensions):
         f['Planck_TTTEEE_lowTEB']=pd.read_hdf(
             'Saved_Fisher_Matrices/planck_TTTEEE_lowTEB'+k[0]+'_Fisher_Matrix_theta.h5', 'key')
         #Planck_TTTEEE_lowTEB and SPT3G
-        f['Planck_TTTEEE_lowTEB_SPT3G_fsky_0.035']=f['Planck_TTTEEE_lowTEB'].add(f['SPT3G_fsky_0.035'])
+     #   f['Planck_TTTEEE_lowTEB_SPT3G_fsky_0.035']=f['Planck_TTTEEE_lowTEB'].add(f['SPT3G_fsky_0.035'])
         f['Planck_TTTEEE_lowTEB_SPT3G_fsky_0.06']=f['Planck_TTTEEE_lowTEB'].add(f['SPT3G_fsky_0.06'])
-        f['Planck_TTTEEE_lowTEB_SPT3G_lensing_fsky_0.035']=f['Planck_TTTEEE_lowTEB'].add(
-            f['SPT3G_lensing_fsky_0.035'])
+     #   f['Planck_TTTEEE_lowTEB_SPT3G_lensing_fsky_0.035']=f['Planck_TTTEEE_lowTEB'].add(
+     #       f['SPT3G_lensing_fsky_0.035'])
         f['Planck_TTTEEE_lowTEB_SPT3G_lensing_fsky_0.06']=f['Planck_TTTEEE_lowTEB'].add(
             f['SPT3G_lensing_fsky_0.06'])
     #Planck_TTTEEE_lowTEB_lensing and SPT3G_lensing
@@ -298,20 +317,20 @@ for i,k in enumerate(model_extensions):
             'Saved_Fisher_Matrices/planck_TTTEEE_lowTEB_lensing'+k[0]+'_Fisher_Matrix_theta.h5', 'key')
         f['Planck_TTTEEE_lowTEB_lensing_SPT3G_lensing_fsky_0.06']=f['Planck_TTTEEE_lowTEB_lensing'].add(
             f['SPT3G_lensing_fsky_0.06'])
-        f['Planck_TTTEEE_lowTEB_lensing_SPT3G_lensing_fsky_0.035']=f['Planck_TTTEEE_lowTEB_lensing'].add(
-            f['SPT3G_lensing_fsky_0.035'])
+    #    f['Planck_TTTEEE_lowTEB_lensing_SPT3G_lensing_fsky_0.035']=f['Planck_TTTEEE_lowTEB_lensing'].add(
+    #        f['SPT3G_lensing_fsky_0.035'])
         #Planck_TTTEEE_lowTEB_lensing_BAO and SPT3G_lensing
     if i in [3]:
         f['Planck_TTTEEE_lowTEB_lensing_BAO']=pd.read_hdf(
             'Saved_Fisher_Matrices/planck_TTTEEE_lowTEB_lensing_BAO'+k[0]+'_Fisher_Matrix_theta.h5', 'key')
         f['Planck_TTTEEE_lowTEB_lensing_BAO_SPT3G_lensing_fsky_0.06']=f['Planck_TTTEEE_lowTEB_lensing_BAO'].add(
             f['SPT3G_lensing_fsky_0.06'])
-        f['Planck_TTTEEE_lowTEB_lensing_BAO_SPT3G_lensing_fsky_0.035']=f['Planck_TTTEEE_lowTEB_lensing_BAO'].add(
-            f['SPT3G_lensing_fsky_0.035'])
+     #   f['Planck_TTTEEE_lowTEB_lensing_BAO_SPT3G_lensing_fsky_0.035']=f['Planck_TTTEEE_lowTEB_lensing_BAO'].add(
+     #       f['SPT3G_lensing_fsky_0.035'])
         #SPTSZ
     if i ==0:
-        f['SPTSZ']=pd.read_hdf('Saved_Fisher_Matrices/SPTSZ_lcdm_Fisher_Matrix_theta.h5', 'key')
+        f['SPTSZ']=pd.read_hdf('Saved_Fisher_Matrices/SPTSZ_lcdm_Fisher_Matrix.h5', 'key')
 
     F[k[0]]=pd.concat(f).transpose()
 
-p.dump(F,open('Saved_Fisher_Matrices\All_Planck_and_SPT3G_Fisher_matrices.p','wb'))
+p.dump(F,open('Saved_Fisher_Matrices\All_Planck_and_SPT3G_Fisher_matrices_test.p','wb'))

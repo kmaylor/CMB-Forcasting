@@ -1,5 +1,4 @@
 from numpy import  array,  log, dot, exp, zeros, errstate,shape, hstack
-from Models.CMB.Fisher_classy import model
 from Models.Foregrounds.spt3G_foregrounds import foregrounds
 from collections import OrderedDict
 
