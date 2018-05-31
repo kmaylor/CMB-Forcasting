@@ -6,14 +6,19 @@ from numpy.random import multivariate_normal
 from numpy import zeros,exp,mean,std
 from numpy.linalg import inv
 
-def get_sigma8_ommh2(params):
-    camb_params={'H0':params[0], 'ombh2':params[1], 'omch2':params[2]-params[1], 'ns':params[3],
+class sigma8_CAMB(object):
+    def __init__(self):
+        import camb as _camb
+        self._camb=_camb
+        
+    def __call__(self,params):
+        camb_params={'H0':params[0], 'ombh2':params[1], 'omch2':params[2]-params[1], 'ns':params[3],
                 'As':params[4]*exp(2*params[5])*1e-9,'tau':params[5]}
-    cp=camb.set_params(**camb_params)
-    cp.set_matter_power(redshifts=[0], kmax=2.0)
-    results = camb.get_results(cp)
-    return (results.get_sigma8()*(cp.omegab+cp.omegac)**.25)[0]
-
+        cp=self._camb.set_params(**camb_params)
+        cp.set_matter_power(redshifts=[0], kmax=2.0)
+        sigma8 = self._camb.get_results(cp).get_sigma8()
+        return (sigma8*(cp.omegab+cp.omegac)**.25,sigma8*((cp.omegab+cp.omegac)/.3)**.5)
+        
 def planck_chain_means(param,model,experiment):
     planck_ex=experiment
     chain_path='/nfs/home/kmaylor/Official_Planck_chains/base'+model[4:]+'/plikHM'+planck_ex[6:]+ \
@@ -31,6 +36,8 @@ def planck_chain_means(param,model,experiment):
                 return planck_chain_means(param,model,'Planck_TTTEEE_lowTEB')
         else:
             return planck_chain_means(param,model,'Planck_TTTEEE_lowTEB')
+    elif '800' in experiment:
+        return planck_chain_means(param,model,'Planck_TT_lowTEB')
     else:
         Planck_chain=K.chains.load_cosmomc_chain(chain_path).burnin(1000).join()
         Planck_chain=add_params(Planck_chain)
@@ -59,25 +66,29 @@ def Fcov(model,ex,p=None,theta=False):
         return pd.DataFrame(inv(df.as_matrix()),index=df.columns,columns=df.columns)
 
 F=p.load(open('Saved_Fisher_Matrices\All_Planck_and_SPT3G_Fisher_matrices.p','rb'))
-
+for k in F.keys():
+    F[k]['Planck_TT_lmax_800'].at['tau','tau']+=.02**(-2)
+    F[k]['Planck_TT_lmax_800_SPT3G_lensing_fsky_0.035'].at['tau','tau']+=.02**(-2)
+    F[k]['SPT3G_lensing_fsky_0.035'].at['tau','tau']+=.02**(-2)
 
 experiments=['Planck_TTTEEE_lowTEB',
              'Planck_TTTEEE_lowTEB_lensing',
-             'Planck_TTTEEE_lowTEB_SPT3G_lensing_fsky_0.06',
-             'Planck_TTTEEE_lowTEB_lensing_SPT3G_lensing_fsky_0.06',
-             'Planck_TT_lmax_800_SPT3G_lensing_fsky_0.06',
-             'SPT3G_lensing_fsky_0.06',
-             'SPT3G_fsky_0.06']
-
-sigma8s=zeros([len(experiments),2])
+             'Planck_TTTEEE_lowTEB_SPT3G_lensing_fsky_0.035',
+             'Planck_TTTEEE_lowTEB_lensing_SPT3G_lensing_fsky_0.035',
+             'Planck_TT_lmax_800_SPT3G_lensing_fsky_0.035',
+             'SPT3G_lensing_fsky_0.035',
+            'Planck_TT_lmax_800']
+sigma8_ommh2=[() for i in experiments]
+S8=[() for i in experiments]
+sig8_camb=sigma8_CAMB()
 for i,ex in enumerate(experiments):
     try:
-        print(ex)
         mu=planck_chain_means(['H0','ombh2','ommh2','ns','clamp','tau'],'lcdm',ex)
         sigma = Fcov('lcdm',ex,['H0','ombh2','ommh2','ns','clamp','tau'])
-        s8s=[get_sigma8_ommh2(p) for p in multivariate_normal(mu,sigma,400)]
-        sigma8s[i,0]=mean(s8s)
-        sigma8s[i,1]=std(s8s)
+        sigma8_ommh2s,S8s=zip(*[sig8_camb(p) for p in multivariate_normal(mu,sigma,1000)])
+        sigma8_ommh2[i]=(mean(sigma8_ommh2s),std(sigma8_ommh2s))
+        S8[i]=(mean(S8s),std(S8s))
     except KeyError:
         continue
-p.dump(sigma8s,open('sigma8_ommh2_0.25_means_stds.pkl','wb'))
+p.dump(sigma8_ommh2,open('Extra_data_for_plots/sigma8_ommh2_0.25_means_stds_fsky_0.035.pkl','wb'))
+p.dump(S8,open('Extra_data_for_plots/S8_means_stds_fsky_0.035.pkl','wb'))

@@ -17,7 +17,7 @@ def top_hat(loc,win_range,binn):
     '''
         Returns a top hat function centered on loc with range= win_range and bin size = binn.
     '''
-    th = zeros(win_range.stop+1)
+    th = zeros(win_range.stop+2)
     th[int(loc-binn//2):int(loc+binn//2+1)]+=(1/binn)
     return th[win_range]
 
@@ -52,15 +52,15 @@ def make_full_cov(spectra,covs):
         |      |      |
     '''
     snum = len(spectra) #number of blocks
-    lnum = len(diag(list(covs.values())[0])) #number of bandpowers 
+    lnum = len(list(covs.values())[0]) #number of bandpowers 
     slnum = snum*lnum #size of full_cov = #block*#bandpowers
     full_cov = zeros([slnum,slnum])
     for i,k in enumerate(spectra):
         for j,l in enumerate(spectra):
             try:
-                full_cov[i*lnum:(i+1)*lnum,j*lnum:(j+1)*lnum] = covs[k+l]
+                full_cov[i*lnum:(i+1)*lnum,j*lnum:(j+1)*lnum] = diag(covs[k+l])
             except KeyError:
-                full_cov[i*lnum:(i+1)*lnum,j*lnum:(j+1)*lnum] = covs[l+k]
+                full_cov[i*lnum:(i+1)*lnum,j*lnum:(j+1)*lnum] = diag(covs[l+k])
     return full_cov
 
 
@@ -94,12 +94,12 @@ def create_basic_cov(fsky,
     """
     ### Fiducial Model for Covariance ###
     if params == None:
-        params={'H0':None,'cosmomc_theta': 1.04106e-2,
-                           'ombh2':0.02227,
-                           'omch2':0.1184,
-                           'tau': 0.067,
-                           'As':2.139e-09,
-                           'ns': 0.9681,
+        params={'H0':None,'cosmomc_theta': 1.04087e-2,
+                           'ombh2':0.02226,
+                           'omch2':0.1193,
+                           'tau': 0.063,
+                           'As':2.13e-09,
+                           'ns': 0.9653,
                            'lmax':6000,}
                            #'lens_potential_accuracy':2.0}
 
@@ -119,9 +119,8 @@ def create_basic_cov(fsky,
     binn=bin_size
     windowrange=slice(specrange[0],specrange[1])
     windows =  array([top_hat(l,windowrange,binn) 
-                    for l in range(windowrange.start+binn//2,windowrange.stop+1-binn//2,binn)])/(binn-1)
+                    for l in range(windowrange.start+binn//2,windowrange.stop+1-max(1,binn//2),binn)])/(max(binn,1))
     ###############
-    
     ### BLOCK MATRIX CALCULATION ###
     '''
     The output of camb (cmb) is in Dl so we multiply the noise term by ell(ell+1)/2pi
@@ -129,9 +128,9 @@ def create_basic_cov(fsky,
     
     def SNB(k,ell):
         try:
-            return cmb[k] + (ell*(ell+1)/(2*pi))/dot(w[k],B2_l(ell))
+            return cmb[k][:params['lmax']+1] + (ell*(ell+1)/(2*pi))/dot(w[k],B2_l(ell))
         except KeyError:
-            return cmb[k]
+            return cmb[k][:params['lmax']+1]
 
     covs = {}
     ell = arange(params['lmax']+1)
@@ -141,17 +140,17 @@ def create_basic_cov(fsky,
         
         if k1==k2:
             if k1 == 'TE': #TETE block
-                covs[k1+k2] = diag(dot(windows,((1/((2*ell+1)*fsky))*(SNB(k1,ell)**2 + 
-                                                         SNB('TT',ell)*SNB('EE',ell)))[windowrange]))
+                covs[k1+k2] = dot(windows,((1/((2*ell+1)*fsky))*(SNB(k1,ell)**2 + 
+                                                         SNB('TT',ell)*SNB('EE',ell)))[windowrange])
                 
             else: #TTTT,EEEE,BBBB blocks
-                covs[k1+k2] = diag(dot(windows,((2/((2*ell+1)*fsky))*SNB(k1,ell)**2)[windowrange]))
+                covs[k1+k2] = dot(windows,((2/((2*ell+1)*fsky))*SNB(k1,ell)**2)[windowrange])
                 
         elif (k1 == 'TT' and k2 =='EE'): #TTEE block
-            covs[k1+k2] = diag(dot(windows,((2/((2*ell+1)*fsky))*SNB('TE',ell)**2)[windowrange]))
+            covs[k1+k2] = dot(windows,((2/((2*ell+1)*fsky))*SNB('TE',ell)**2)[windowrange])
             
         elif ((k1 == 'TT' or k1=='EE') and k2 == 'TE'): #TTTE and EETE blocks
-            covs[k1+k2] = diag(dot(windows,((2/((2*ell+1)*fsky))*SNB('TE',ell)*SNB(k1,ell))[windowrange]))
+            covs[k1+k2] = dot(windows,((2/((2*ell+1)*fsky))*SNB('TE',ell)*SNB(k1,ell))[windowrange])
             
     #########################
     

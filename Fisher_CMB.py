@@ -46,7 +46,7 @@ def Fisher_Matrix(params,cov,model,show_results=True):
         for i,x in enumerate(zip(params_to_return,sqrt(diag(inv(FM))))):
             print(i,x[0],x[1])
         
-    return (marginalize(params,add_priors(params,Fisher_Calc(derivative(model,params),cov))), params_to_return)
+    return (FM, params_to_return)
         
     
         

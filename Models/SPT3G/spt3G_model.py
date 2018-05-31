@@ -24,7 +24,7 @@ class spt3G_model():
         
         #Top hat window functions
         self.windows =  {k:array([self.top_hat(l,v,bin_size) 
-                               for l in range(v.start+bin_size//2,v.stop+1-bin_size//2,bin_size)]) 
+                               for l in range(v.start+bin_size//2,v.stop+1-max(1,bin_size//2),bin_size)]) 
                                for k,v in self.windowrange.items()}
         
         #Maximum number of bins for a spectrum. Will need to pad the array with zeros to keep the same shape as 
@@ -70,7 +70,7 @@ class spt3G_model():
             params['As']=params['clamp']*exp(2*params.get('tau',.07))*1e-9
             params.pop('clamp',[])
         if params.get('ommh2',None) is not None: 
-            params['omch2']=params['ommh2']-params.get('ombh2',.0222)
+            params['omch2']=params['ommh2']-params.get('ombh2',.02227)
             params.pop('ommh2',[])
         params['spectra'] = self.windows.keys()
         foregrounds = self.foregrounds(**params)
@@ -92,7 +92,7 @@ class spt3G_model():
         Returns a top hat function centered on loc with range= win_range and bin size = binn.
         '''
         th = zeros(win_range.stop+1)
-        th[int(loc-binn//2):int(loc+binn//2+1)]+=(1/binn)
+        th[int(loc-binn//2):int(loc+binn//2+binn%2)]+=(1/binn)
         return th[win_range]
     
     def aberration(self,y):

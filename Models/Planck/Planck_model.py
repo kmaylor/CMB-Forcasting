@@ -25,7 +25,7 @@ class planck_model():
         
         #Top hat window functions
         self.windows =  {k:array([self.top_hat(l,v,bin_size) 
-                               for l in range(v.start+bin_size//2,v.stop+1-bin_size//2,bin_size)]) 
+                               for l in range(v.start+bin_size//2,v.stop+1-max(1,bin_size//2),bin_size)]) 
                                for k,v in self.windowrange.items()}
         
         #Maximum number of bins for a spectrum. Will need to pad the array with zeros to keep the same shape as 
@@ -78,7 +78,7 @@ class planck_model():
         
         #Calculate model for current params
         cmb = self.cmb(**params)
-        foregrounds = self.foregrounds(**params)
+        #foregrounds = self.foregrounds(**params)
         cals = {'TT':1/params.get('Tcal',1)**2,
                 'TE':1/(params.get('Tcal',1)**(2)*params.get('Pcal',1)),
                 'EE':1/((params.get('Tcal',1)**(2)*params.get('Pcal',1)**(2)))}
@@ -90,5 +90,5 @@ class planck_model():
         Returns a top hat function centered on loc with range= win_range and bin size = binn.
         '''
         th = zeros(win_range.stop+1)
-        th[int(loc-binn//2):int(loc+binn//2+1)]+=(1/binn)
+        th[int(loc-binn//2):int(loc+binn//2+binn%2)]+=(1/binn)
         return th[win_range]

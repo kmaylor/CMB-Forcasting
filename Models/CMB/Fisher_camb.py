@@ -61,7 +61,7 @@ class model():
 
         cp=self._camb.set_params(**params)
         self.result = self._camb.get_results(cp)
-        if lensing=='yes':
+        if lensing:
             total='total'
         else: 
             total='unlensed_total'
